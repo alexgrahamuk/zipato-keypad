@@ -26,6 +26,8 @@ metadata {
 		fingerprint inClusters: "0x60, 0x25"
 		fingerprint inClusters: "0x60, 0x26"
 		fingerprint inClusters: "0x5E, 0x59, 0x60, 0x8E"
+        
+        command "getUsers"
 	}
 
 	simulator {
@@ -59,6 +61,31 @@ metadata {
 
 import physicalgraph.zwave.commands.usercodev1.*
 
+def getUsers() {
+	log.debug("Asked for users")
+    def event = createEvent(descriptionText: "${device.displayName} getting user numbers")
+    def cmds = []
+    cmds << zwave.userCodeV1.usersNumberGet().format()
+    cmds << zwave.userCodeV1.usersNumberReport().format()
+ //   response(cmds)
+    [event, response(cmds)]    
+    return []
+}
+
+def zwaveEvent(physicalgraph.zwave.commands.usercodev1.UserCodeGet cmd) {
+	log.debug("Mega Banana!")
+}
+
+def zwaveEvent(physicalgraph.zwave.commands.usercodev1.UsersNumberGet cmd) {
+	log.debug("Mega Sandwich!")
+}
+
+def zwaveEvent(physicalgraph.zwave.commands.usercodev1.UsersNumberReport cmd) {
+	log.debug("Mega Tooth: $cmd")
+}
+
+
+
 def parse(String description) {
 	def result = null
 	if (description.startsWith("Err")) {
@@ -78,7 +105,7 @@ def zwaveEvent(physicalgraph.zwave.commands.alarmv2.AlarmReport cmd) {
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.usercodev1.UserCodeReport cmd) {
-	log.debug("Smecker!")
+	log.debug("Smecker: $cmd")
     
     /*
 	String	code
@@ -97,7 +124,10 @@ def zwaveEvent(physicalgraph.zwave.commands.usercodev1.UserCodeReport cmd) {
     
     def event = createEvent(descriptionText: "${device.displayName} trying to register", displayed: false)
     def cmds = []
-    cmds << zwave.userCodeV1.userCodeSet(userIdentifier:cmd.userIdentifier, userIdStatus:1, user: "1").format()
+    //cmds << zwave.userCodeV1.userCodeSet(userIdentifier:cmd.userIdentifier, userIdStatus:1, user: "1").format()
+    cmds << zwave.userCodeV1.userCodeGet(userIdentifier: 1).format()
+    //cmds << zwave.userCodeV1.usersNumberReport().format()
+    
     [event, response(cmds)]    
 }
 
