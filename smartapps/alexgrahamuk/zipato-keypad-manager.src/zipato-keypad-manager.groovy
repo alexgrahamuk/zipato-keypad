@@ -11,7 +11,7 @@ definition(
 
 preferences {
     section("Devices") {
-        input(name: "devices", type: "device.zipatoKeypad", title: "Zipato Keypad", required: true, displayDuringSetup: true, multiple: false)
+        input(name: "keypad", type: "device.zipatoKeypad", title: "Zipato Keypad", required: true, displayDuringSetup: true, multiple: false)
     }
 }
 
@@ -25,6 +25,7 @@ def updated() {
     log.debug "Updated with settings: ${settings}"
     unsubscribe()
     initialize()
+    keypad.getUsers()
 }
 
 def initialize() {
@@ -33,6 +34,7 @@ def initialize() {
 //    subscribe(devices, "switch.off", "switchOffHandler")
 //    subscribe(devices, "refresh.refresh", "switchRefreshHandler")
 //    subscribe(gateway, "ping", "switchStatusHandler")
+
 
 }
 
@@ -78,4 +80,3 @@ def switchStatusHandler(evt) {
 
     //sendEvent(name: "power", value: "123", isStateChange: true)*/
 }
-
