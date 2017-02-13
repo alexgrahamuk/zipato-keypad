@@ -14,12 +14,11 @@
 metadata {
 	definition (name: "Zipato Keypad", namespace: "alexgrahamuk", author: "Alex Graham") {
 		capability "Actuator"
-		capability "Switch"
-		capability "Switch Level"
 		capability "Refresh"
 		capability "Configuration"
 		capability "Sensor"
 		capability "Zw Multichannel"
+        capability "Polling"
 		capability "Battery"
 
 		fingerprint inClusters: "0x60"
@@ -61,37 +60,38 @@ metadata {
 
 import physicalgraph.zwave.commands.usercodev1.*
 
-def getUsers() {
-	log.debug("Asked for users")
-    def event = createEvent(descriptionText: "${device.displayName} getting user numbers")
-    def cmds = []
-    cmds << zwave.userCodeV1.usersNumberGet().format()
-    cmds << zwave.userCodeV1.usersNumberReport().format()
- //   response(cmds)
-    [event, response(cmds)]    
-    return []
+
+def poll() {
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.usercodev1.UserCodeGet cmd) {
-	log.debug("Mega Banana!")
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.usercodev1.UsersNumberGet cmd) {
-	log.debug("Mega Sandwich!")
+def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) {
+	if (cmd.batteryLevel == 0xFF) {
+    	log.debug "Low Battery"
+	} else {
+		log.debug "Battery: ${cmd.batteryLevel}"
+	}
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.usercodev1.UsersNumberReport cmd) {
-	log.debug("Mega Tooth: $cmd")
+    def event = createEvent(descriptionText: "${device.displayName} user report: $cmd", displayed: false)
+    def cmds = []
+   
+   	//Reset all codes
+	//cmds << zwave.userCodeV1.userCodeSet(userIdentifier:0, userIdStatus: 0, code: "").format()
+   
+    for (i in 1..2) {
+    	cmds << zwave.userCodeV1.userCodeGet(userIdentifier: i).format()
+    }
+       
+    [event, response(cmds)]  
 }
-
-
 
 def parse(String description) {
 	def result = null
 	if (description.startsWith("Err")) {
 	    result = createEvent(descriptionText:description, isStateChange:true)
 	} else if (description != "updated") {
-		def cmd = zwave.parse(description, [0x71: 2, 0x63: 1, 0x20: 1, 0x84: 1, 0x98: 1, 0x56: 1, 0x60: 3])
+		def cmd = zwave.parse(description, [0x80: 1, 0x71: 2, 0x63: 1, 0x20: 1, 0x84: 2, 0x98: 1, 0x56: 1, 0x60: 3])
 		if (cmd) {
 			result = zwaveEvent(cmd)
 		}
@@ -101,80 +101,66 @@ def parse(String description) {
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.alarmv2.AlarmReport cmd) {
-	log.debug("Yeah!!!! $cmd")
+    def event = createEvent(descriptionText: "${device.displayName} alarm went: $cmd", displayed: false)
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.usercodev1.UserCodeReport cmd) {
-	log.debug("Smecker: $cmd")
-    
-    /*
-	String	code
-    Object	user
-    Short	userIdStatus
-    Short	userIdentifier
-    List<Short>	payload
-
-    Short	USER_ID_STATUS_AVAILABLE_NOT_SET	= 0
-    Short	USER_ID_STATUS_OCCUPIED	= 1
-    Short	USER_ID_STATUS_RESERVED_BY_ADMINISTRATOR	= 2
-    Short	USER_ID_STATUS_STATUS_NOT_AVAILABLE	= 255
-
-	String format()
-	*/
-    
-    def event = createEvent(descriptionText: "${device.displayName} trying to register", displayed: false)
+    def event = createEvent(descriptionText: "${device.displayName} trying to register: $cmd", displayed: false)
     def cmds = []
-    //cmds << zwave.userCodeV1.userCodeSet(userIdentifier:cmd.userIdentifier, userIdStatus:1, user: "1").format()
-    cmds << zwave.userCodeV1.userCodeGet(userIdentifier: 1).format()
-    //cmds << zwave.userCodeV1.usersNumberReport().format()
+   
+    //cmds << zwave.userCodeV1.userCodeSet(userIdentifier:1, userIdStatus: 1, code: "1111").format()
+    //cmds << zwave.userCodeV1.userCodeGet(userIdentifier:1).format()
+    //cmds << zwave.wakeUpV2.wakeUpNoMoreInformation().format()
+ 
+ 	//Convert those pesky RFID tags
+    def meh = []
+    for (a in cmd.user) {
+    	def va = new Short(a)
+        if (va <= 48)
+        	va = -48 + (-va)
+		meh.add(va)
+    }
+
+	//cmds << zwave.userCodeV1.userCodeSet(userIdentifier:2, userIdStatus: 1, user: meh).format()
+    //cmds << zwave.userCodeV1.userCodeGet(userIdentifier:2).format()
+    //cmds << zwave.wakeUpV2.wakeUpNoMoreInformation().format()
     
+    if (cmd.userIdStatus == UserCodeReport.USER_ID_STATUS_AVAILABLE_NOT_SET)
+    	cmds << zwave.userCodeV1.usersNumberGet().format()
+
+	[event, response(cmds)]    
+}
+
+
+def zwaveEvent(physicalgraph.zwave.commands.wakeupv2.WakeUpNotification cmd) {
+	def event = createEvent(descriptionText: "${device.displayName} woke up v2", isStateChange:true)
+    def cmds = []
+	cmds << zwave.batteryV1.batteryGet().format()  
     [event, response(cmds)]    
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) {
-	/*def map = [ name: "battery", unit: "%" ]
-	if (cmd.batteryLevel == 0xFF) {
-		map.value = 1
-		map.descriptionText = "$device.displayName has a low battery"
-	} else {
-		map.value = cmd.batteryLevel
-	}
-	state.lastbatt = now()
-	createEvent(map)*/
-    debug.log("Battery: $cmd")
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.wakeupv1.WakeUpNotification cmd) {
-	[ createEvent(descriptionText: "${device.displayName} woke up", isStateChange:true),
-	  response(["delay 2000", zwave.wakeUpV1.wakeUpNoMoreInformation().format()]) ]
 }
 
 def zwaveEvent(physicalgraph.zwave.Command cmd) {
 	createEvent(descriptionText: "$device.displayName: $cmd", isStateChange: true)
 }
 
-def on() {
-	commands([zwave.basicV1.basicSet(value: 0xFF), zwave.basicV1.basicGet()])
-}
-
-def off() {
-	commands([zwave.basicV1.basicSet(value: 0x00), zwave.basicV1.basicGet()])
-}
-
 def refresh() {
-	command(zwave.basicV1.basicGet())
+	poll()
 }
 
 def configure() {
 }
 
 
-private command(physicalgraph.zwave.Command cmd) {
-	if (state.sec) {
-		zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
-	} else {
-		cmd.format()
+def zwaveEvent(physicalgraph.zwave.commands.securityv1.SecurityMessageEncapsulation cmd) {
+	def encapsulatedCommand = cmd.encapsulatedCommand([0x62: 1, 0x71: 2, 0x80: 1, 0x85: 2, 0x63: 1, 0x98: 1, 0x86: 1])
+	// log.debug "encapsulated: $encapsulatedCommand"
+	if (encapsulatedCommand) {
+		zwaveEvent(encapsulatedCommand)
 	}
+}
+
+private command(physicalgraph.zwave.Command cmd) {
+    zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
 }
 
 private commands(commands, delay=200) {
