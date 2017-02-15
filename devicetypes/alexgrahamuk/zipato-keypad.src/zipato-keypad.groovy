@@ -13,6 +13,11 @@
  */
 metadata {
 	definition (name: "Zipato Keypad", namespace: "alexgrahamuk", author: "Alex Graham") {
+    
+        preferences {
+        	input ("feedbackTimeout", "number", title: "Feedback Timeout (seconds)", description: "Number of seconds to beep and (optionally wait) before sending the mode change", default: 5, displayDuringSetup: true)
+    	}
+    
 		capability "Actuator"
 		capability "Refresh"
 		capability "Configuration"
@@ -59,17 +64,17 @@ metadata {
 }
 
 import physicalgraph.zwave.commands.usercodev1.*
+import physicalgraph.zwave.commands.switchbinaryv1.*
 
 
 def poll() {
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) {
-	if (cmd.batteryLevel == 0xFF) {
-    	log.debug "Low Battery"
-	} else {
-		log.debug "Battery: ${cmd.batteryLevel}"
-	}
+	log.debug("Battery: $cmd.batteryLevel")
+	def event = createEvent(descriptionText: "${device.displayName} battery report: $cmd", displayed: false)
+    def cmds = []
+    [event, response(cmds)]
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.usercodev1.UsersNumberReport cmd) {
@@ -91,7 +96,7 @@ def parse(String description) {
 	if (description.startsWith("Err")) {
 	    result = createEvent(descriptionText:description, isStateChange:true)
 	} else if (description != "updated") {
-		def cmd = zwave.parse(description, [0x80: 1, 0x71: 2, 0x63: 1, 0x20: 1, 0x84: 2, 0x98: 1, 0x56: 1, 0x60: 3])
+		def cmd = zwave.parse(description, [0x80: 1, 0x71: 2, 0x25: 1, 0x70: 1, 0x63: 1, 0x20: 1, 0x84: 2, 0x98: 1, 0x56: 1, 0x60: 3])
 		if (cmd) {
 			result = zwaveEvent(cmd)
 		}
@@ -102,6 +107,19 @@ def parse(String description) {
 
 def zwaveEvent(physicalgraph.zwave.commands.alarmv2.AlarmReport cmd) {
     def event = createEvent(descriptionText: "${device.displayName} alarm went: $cmd", displayed: false)
+    def cmds = []
+    
+    cmds << zwave.configurationV1.configurationSet(configurationValue: [Integer.valueOf(String.valueOf(feedbackTimeout), 16)], parameterNumber: 2, size: 1).format()
+   
+    cmds << zwave.switchBinaryV1.switchBinarySet(switchValue: 0xFF).format()
+    [event, response(cmds)]
+}
+
+def zwaveEvent(physicalgraph.zwave.commands.switchbinaryv1.SwitchBinaryReport cmd) {
+    def event = createEvent(descriptionText: "${device.displayName} binary went off: $cmd", displayed: false)
+    def cmds = []
+    cmds << zwave.wakeUpV2.wakeUpNoMoreInformation().format()
+    [event, response(cmds)]	
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.usercodev1.UserCodeReport cmd) {
