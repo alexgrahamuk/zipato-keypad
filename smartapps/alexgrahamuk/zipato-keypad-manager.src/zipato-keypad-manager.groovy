@@ -10,11 +10,68 @@ definition(
 )
 
 preferences {
-    section("Devices") {
-        input(name: "keypad", type: "device.zipatoKeypad", title: "Zipato Keypad", required: true, displayDuringSetup: true, multiple: false)
-    }
+
+	page(name: "page1", title: "Select keypads and maximum users", uninstall: true)
+    page(name: "page2", title: "User Setup", uninstall: false, install: false)
+    page(name: "page3", title: "Edit User", uninstall: false, install: false)
 }
 
+def page1() {
+
+	dynamicPage(name: "page1") {
+    
+        section {
+            input(name: "keypads", type: "device.zipatoKeypad", title: "Zipato Keypads", required: true, multiple: true)
+            input(name: "maxUsers", type: "number", title: "Number of Users", range: "0..255", required: true, default: 0)
+        }
+
+		if (maxUsers > 0) {
+            section("Manage Users") {
+                href(name: "linkToPage2", title: "Manage Users", required: false, page: "page2")
+            }        
+        }
+    
+    }
+
+}
+
+def page2() {
+    dynamicPage(name: "page2") {
+    
+            section("Users") {
+            
+            	for (int x=0; x<maxUsers; x++) {
+                	def p = [userID: x as String, smecker: "ih2"]
+         	   		href(name: "linkToPage3${x}", title: "Edit User $x (Bob)", required: false, page: "page3", params: p)
+               }
+        	}
+    }
+}	
+
+def page3(params) {
+
+	log.debug("Params Page 3: $params")
+
+	if (params.smecker) {
+    	atomicState.params = params
+    } else {
+    	params = atomicState.params
+    }
+
+   	def uid = "userCode${params.userID}"
+        
+	log.debug("UID is: $uid")
+    log.debug("Current Settings: $settings")
+
+    dynamicPage(name: "page3", title: "Editing User $params.userID X (Bob)") {
+    
+        section {
+        	label(title: "${uid}")
+            input(name: "${uid}", type: "text", title: "User Code", required: true, default: "1234", submitOnChange: true)
+        }
+        
+    }
+}
 
 def installed() {
     log.debug "Installed with settings: ${settings}"
@@ -23,9 +80,9 @@ def installed() {
 
 def updated() {
     log.debug "Updated with settings: ${settings}"
-    unsubscribe()
+    //unsubscribe()
     initialize()
-    keypad.getUsers()
+    //keypad.getUsers()
 }
 
 def initialize() {
