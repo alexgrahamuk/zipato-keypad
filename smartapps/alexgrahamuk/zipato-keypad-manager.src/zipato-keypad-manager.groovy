@@ -18,10 +18,10 @@ preferences {
 
 def page1() {
 
-	dynamicPage(name: "page1") {
+	dynamicPage(name: "page1", install: true, uninstall: true) {
     
         section {
-            input(name: "keypads", type: "device.zipatoKeypad", title: "Zipato Keypads", required: true, multiple: true)
+            input(name: "keypads", type: "capability.lockCodes", title: "Zipato Keypads", required: true, multiple: true)
             input(name: "maxUsers", type: "number", title: "Number of Users", range: "0..255", required: true, default: 0)
         }
 
@@ -35,8 +35,10 @@ def page1() {
 
 }
 
+
 def page2() {
-    dynamicPage(name: "page2") {
+
+	dynamicPage(name: "page2") {
     
             section("Users") {
             
@@ -66,8 +68,7 @@ def page3(params) {
     dynamicPage(name: "page3", title: "Editing User $params.userID X (Bob)") {
     
         section {
-        	label(title: "${uid}")
-            input(name: "${uid}", type: "text", title: "User Code", required: true, default: "1234", submitOnChange: true)
+            input(name: "${uid}", type: "text", title: "User Code", defaultValue: settings."userCode${params.userID}", required: true, submitOnChange: true)
         }
         
     }
@@ -80,60 +81,36 @@ def installed() {
 
 def updated() {
     log.debug "Updated with settings: ${settings}"
-    //unsubscribe()
+    unsubscribe()
     initialize()
-    //keypad.getUsers()
 }
 
 def initialize() {
 
-//    subscribe(devices, "switch.on", "switchOnHandler")
-//    subscribe(devices, "switch.off", "switchOffHandler")
-//    subscribe(devices, "refresh.refresh", "switchRefreshHandler")
-//    subscribe(gateway, "ping", "switchStatusHandler")
+	log.debug("init called")
+    subscribe(keypads, "switch.on", switchOnHandler)
+    subscribe(keypads, "alarm.armed", armedHandler)
+    subscribe(keypads, "alarm.reallyArmed", reallyHandler)
+}
 
 
+def reallyHandler(evt) {
+	log.debug("It really is armed")
+    location.setMode("Away")
+    location.setMode("Home")
+}
+
+def armedHandler(evt) {
+	log.debug("Alarm Handler")
+    runIn(Integer.valueOf(String.valueOf(evt.value)), armAlarm)
+}
+
+def armAlarm() {
+	keypads.armAlarm()
 }
 
 def switchOnHandler(evt)
 {
-//    log.debug("A switch turned on")
-//    log.debug(evt.getDevice().deviceNetworkId)
-//    gateway.poll()
-//    gateway.executeCommand("on", evt.getDevice().currentValue('outletIP'), evt.getDevice().deviceNetworkId)
-}
-
-def switchOffHandler(evt)
-{
-//    log.debug("A switch turned off")
-//    gateway.executeCommand("off", evt.getDevice().currentValue('outletIP'), evt.getDevice().deviceNetworkId)
-}
-
-def switchRefreshHandler(evt)
-{
-//    log.debug("A switch was refreshed")
-//    gateway.executeCommand("status", evt.getDevice().currentValue('outletIP'), evt.getDevice().deviceNetworkId)
-}
-
-def switchStatusHandler(evt) {
-
-  /*  log.debug("A switch was queried for status")
-
-    def description = evt.value
-    message("Parsing: $description")
-
-    def msg = parseLanMessage(description)
-
-    def headersAsString = msg.header // => headers as a string
-    def headerMap = msg.headers      // => headers as a Map
-    def body = msg.body              // => request body as a string
-    def status = msg.status          // => http status code of the response
-    def json = msg.json              // => any JSON included in response body, as a data structure of lists and maps
-    def xml = msg.xml                // => any XML included in response body, as a document tree structure
-    def data = msg.data
-
-    //def uuid = UUID.randomUUID().toString()
-    //device.deviceNetworkId = "tp_link_${uuid}"
-
-    //sendEvent(name: "power", value: "123", isStateChange: true)*/
+	log.debug("Users Number Call")
+	keypads.reloadAllCodes()
 }
