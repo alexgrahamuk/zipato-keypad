@@ -31,10 +31,10 @@ metadata {
         command "getUsers"
         command "armAlarm"
 
-		fingerprint inClusters: "0x60"
-		fingerprint inClusters: "0x60, 0x25"
-		fingerprint inClusters: "0x60, 0x26"
-		fingerprint inClusters: "0x5E, 0x59, 0x60, 0x8E"
+        //Raw Description
+        //zw:S type:4000 mfr:0097 prod:6131 model:4501 ver:0.28 zwv:3.67 lib:03 cc:85,80,84,86,72,71,70,25,63
+        fingerprint mfr: "0097", prod: "6131", model: "4501"
+        
        
 	}
 
@@ -64,13 +64,20 @@ import physicalgraph.zwave.commands.switchbinaryv1.*
 def updateCodes() {
 }
 
-def setCode() {
+def setCode(id, code) {
+
+    def cmds = []
+    //cmds << zwave.userCodeV1.userCodeSet(userIdentifier: $id, userIdStatus: 1, code: "$code").format()
+    //cmds << zwave.userCodeV1.userCodeGet(userIdentifier: $id).format()
+	return response(cmds)
 }
 
-def deleteCode() {
+def deleteCode(id) {
+    //cmds << zwave.userCodeV1.userCodeSet(userIdentifier: $id, userIdStatus: 0, code: "").format()
 }
 
-def requestCode() {
+def requestCode(id) {
+	//cmds << zwave.userCodeV1.userCodeGet(userIdentifier: $id).format()
 }
 
 def armAlarm() {
