@@ -14,6 +14,8 @@ preferences {
 	page(name: "page1", title: "Select keypads and maximum users", uninstall: true)
     page(name: "page2", title: "User Setup", uninstall: false, install: false)
     page(name: "page3", title: "Edit User", uninstall: false, install: false)
+    page(name: "removePage", title: "Remove User", uninstall: false, install: false)
+    page(name: "doRemovePage", title: "User Removed", uninstall: false, install: false)
 }
 
 def page1() {
@@ -25,7 +27,7 @@ def page1() {
             input(name: "maxUsers", type: "number", title: "Number of Users", range: "0..255", required: true, default: 0)
         }
 
-		if (maxUsers > 0) {
+		if ((keypads > 0) && (maxUsers > 0)) {
             section("Manage Users") {
                 href(name: "linkToPage2", title: "Manage Users", required: false, page: "page2")
             }        
@@ -40,14 +42,17 @@ def page2() {
 
 	dynamicPage(name: "page2") {
     
-            section("Users") {
+        section("Users") {
+
+            for (int x=0; x<maxUsers; x++) {
+                def p = [userID: x as String, smecker: "ih2"]
+                href(name: "linkToPage3${x}", title: "Edit User $x (Bob)", required: false, page: "page3", params: p)
+            }
             
-            	for (int x=0; x<maxUsers; x++) {
-                	def p = [userID: x as String, smecker: "ih2"]
-         	   		href(name: "linkToPage3${x}", title: "Edit User $x (Bob)", required: false, page: "page3", params: p)
-               }
-        	}
+        }
+        
     }
+    
 }	
 
 def page3(params) {
@@ -68,18 +73,99 @@ def page3(params) {
     dynamicPage(name: "page3", title: "Editing User $params.userID X (Bob)") {
     
         section {
-            input(name: "${uid}", type: "text", title: "User Code", defaultValue: settings."userCode${params.userID}", required: true, submitOnChange: true)
+        	input(name: "userName${params.userID}", type: "text", title: "User Name", defaultValue: settings."userName${params.userID}", required: true)
+            input(name: "userCode${params.userID}", type: "text", title: "User Code", defaultValue: settings."userCode${params.userID}", required: true)
+            input(name: "userIsTag${params.userID}", type: "bool", title: "RFID Tag?", defaultValue: settings."userIsTag${params.userID}", required: true)
+            input(name: "userDisabled${params.userID}", type: "bool", title: "User Disabled", defaultValue: settings."userDisabled${params.userID}", required: true)
+        }
+        
+        section {
+        	href(name: "linkToRemovePage${params.userID}", title: "Remove User $x (Bob)", required: false, page: "removePage", params: params)
         }
         
     }
 }
+
+
+def removePage(params) {
+
+	if (params.smecker) {
+    	atomicState.params = params
+    } else {
+    	params = atomicState.params
+    }
+    
+    
+    dynamicPage(name: "removePage", title: "Remove User") {
+    
+        section {
+        	href(name: "linkToDoRemovePage${params.userID}", title: "Remove User $x (Bob)", required: false, page: "doRemovePage", params: params)
+            href(name: "linkBackToPage3${params.userID}", title: "Cancel", required: false, page: "page3", params: params)
+        }
+        
+    }    
+
+}
+
+def doRemovePage(params) {
+
+	log.debug("AAA: $params")
+
+	if (params.smecker) {
+    	atomicState.params = params
+    } else {
+    	params = atomicState.params
+    }
+    
+    log.debug("BBB: $params")
+
+    def x = params.userID
+    
+	if (!state.users)
+    	state.users = [:]
+   
+    if (!state.users."user${x}")
+    	state.users."user${x}" = [:]
+    
+	state.users."user${x}".requiresUpdate = true
+    state.users."user${x}".deleted = true
+    
+    dynamicPage(name: "doRemovePage", title: "User Removed") {
+    
+        section {
+        	paragraph "User has been removed."
+            href(name: "linkBackToPage2${params.userID}", title: "Continue", required: false, page: "page2")
+        }
+        
+    }    
+}
+
 
 def installed() {
     log.debug "Installed with settings: ${settings}"
     initialize()
 }
 
+
 def updated() {
+
+	if (!state.users)
+    	state.users = [:]
+
+    for (int x=0; x<maxUsers; x++) {
+    
+    	if (!state.users."user${x}")
+        	state.users."user${x}" = [:]
+    
+    	if (settings."userCode${x}" != state.users."user${x}".code)
+        	state.users."user${x}".requiresUpdate = true
+            
+    	if (settings."userIsTag${x}" != state.users."user${x}".isTag)
+        	state.users."user${x}".requiresUpdate = true
+     
+    }
+
+	log.debug(state.users)
     log.debug "Updated with settings: ${settings}"
     unsubscribe()
     initialize()
@@ -91,6 +177,21 @@ def initialize() {
     subscribe(keypads, "switch.on", switchOnHandler)
     subscribe(keypads, "alarm.armed", armedHandler)
     subscribe(keypads, "alarm.reallyArmed", reallyHandler)
+}
+
+
+def updateCodes() {
+
+    for (int x=0; x<maxUsers; x++) {
+    
+    	if (state.users."user${x}".requiresUpdate) {
+        	keypads.setCode(x, settings."userCode${x}")
+            state.users."user${x}".requiresUpdate = false
+            state.users."user${x}".code = settings."userCode${x}"
+        }
+        
+    }
+
 }
 
 
@@ -111,6 +212,10 @@ def armAlarm() {
 
 def switchOnHandler(evt)
 {
-	log.debug("Users Number Call")
-	keypads.reloadAllCodes()
+	log.debug(state.users)
+    updateCodes()
+    log.debug(state.users)
+    
+	//log.debug("Users Number Call")
+	//keypads.reloadAllCodes()
 }
